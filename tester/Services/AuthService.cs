@@ -7,6 +7,7 @@ using System.Security.Claims;
 using System.Text;
 using tester.Data;
 using tester.DTOs;
+using tester.Helpers;
 using tester.Models;
 using tester.Services.Interfaces;
 
@@ -29,16 +30,17 @@ namespace tester.Services
 
         public async Task<User> Register(CreateUserRequestDTO requestDTO)
         {
+            
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u=> u.Username == requestDTO.Username);
+
+            if (existingUser != null) throw new Exception(Constants.UsernameAlreadyExistsMessage);
+
+            var user = _mapper.Map<User>(requestDTO);
+            user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
+            user.Active = Constants.DefaultUserActiveStatus;
+
             try
             {
-                var existingUser = await _context.Users.FirstOrDefaultAsync(u=> u.Username == requestDTO.Username);
-
-                if (existingUser != null) throw new Exception("Username already exists");
-
-                var user = _mapper.Map<User>(requestDTO);
-                user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
-                user.Active = true;
-
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
@@ -53,107 +55,117 @@ namespace tester.Services
 
         public async Task<string> Login(LoginRequestDTO userForLogin)
         {
+            
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == userForLogin.Username);
+
+            if (user == null || !user.Active) 
+                throw new Exception(Constants.InvalidUsernameOrPasswordMessage);
+
+            var currentEATTime = DateTimeHelper.GetCurrentEATTime();
+
+            // Check if the account is locked
+            if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > currentEATTime)
+                throw new Exception(Constants.AccountLockedMessage);
+
+            //Verify the Password
+            if (!BCrypt.Net.BCrypt.Verify(userForLogin.Password, user.Password))
+            {
+                user.FailedLoginAttempts++;
+
+                //Lock the account if max attempts are reached
+                if (user.FailedLoginAttempts >= Constants.MaxLogMaxFailedLoginAttemptsinAttempts)
+                {
+                    user.LockoutEnd = currentEATTime.AddMinutes(Constants.AccountLockoutDurationInMinutes);
+                    user.FailedLoginAttempts = 0;
+                }
+
+                await _context.SaveChangesAsync();
+                throw new Exception(Constants.InvalidUsernameOrPasswordMessage);
+            }
+
+            // Reset failed login attempts on successful login
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
+
+            await _context.SaveChangesAsync();
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]);
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new[]
+                {
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(ClaimTypes.Name, user.Username)
+            }),
+                Expires = DateTime.UtcNow.AddDays(Convert.ToDouble(_configuration["Jwt:ExpireDays"])),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
+
             try
             {
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == userForLogin.Username);
-
-                // if (user == null || !BCrypt.Net.BCrypt.Verify(userForLogin.Password, user.Password) || !user.Active) return null;
-                if (user == null || !user.Active) return null;
-
-
-                // Check if the account is locked
-                //if (user.)
-
-
-
-                var tokenHandler = new JwtSecurityTokenHandler();
-                var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]);
-
-                var tokenDescriptor = new SecurityTokenDescriptor
-                {
-                    Subject = new ClaimsIdentity(new[]
-                    {
-                    new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-                    new Claim(ClaimTypes.Name, user.Username)
-                }),
-                    Expires = DateTime.UtcNow.AddDays(Convert.ToDouble(_configuration["Jwt:ExpireDays"])),
-                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-                };
-
                 var token = tokenHandler.CreateToken(tokenDescriptor);
                 return tokenHandler.WriteToken(token);
-            } catch (Exception ex) 
-            { 
-                throw new Exception("An error occurred while logging in.", ex); 
             }
+            catch (Exception ex) { 
+                throw new Exception(Constants.LoginErrorMessage, ex);
+            }           
         }
 
         public async Task<bool> ForgotPassword(ForgotPasswordRequestDTO forgotPasswordRequest)
         {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == forgotPasswordRequest.Email);
+
+            if (user == null) throw new Exception(Constants.InvalidUsernameOrPasswordMessage);
+
+            var resetPasswordToken = Guid.NewGuid().ToString();
+            var resetPasswordExpires = DateTimeHelper.GetCurrentEATTime().AddMinutes(Constants.PasswordResetTokenExpiryMinutes);
+
+            var passwordReset = new PasswordReset
+            {
+                UserId = user.UserId,
+                ResetPasswordExpires = resetPasswordExpires,
+                ResetPasswordToken = resetPasswordToken
+            };
+
             try
             {
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == forgotPasswordRequest.Email);
-
-                if (user == null) return false;
-
-                // Convert current time to EAT
-                var easternAfricaTimeZone = TimeZoneInfo.FindSystemTimeZoneById("E. Africa Standard Time");
-
-                var resetPasswordToken = Guid.NewGuid().ToString();
-                var resetPasswordExpires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddMinutes(Constants.PasswordResetTokenExpiryMinutes), easternAfricaTimeZone);
-
-                var passwordReset = new PasswordReset
-                {
-                    UserId = user.UserId,
-                    ResetPasswordExpires = resetPasswordExpires,
-                    ResetPasswordToken = resetPasswordToken
-                };
-
                 _context.PasswordResets.Add(passwordReset);
-
                 await _context.SaveChangesAsync();
-
-                // Implement send email
                 _emailService.SendPasswordResetEmail(user.Username, resetPasswordToken);
-
                 return true;
             }
-            catch (Exception ex) 
-            {
-                throw new Exception($"An error occurred while processing forgot password request", ex);
-            }
+            catch (Exception ex)
+            { 
+                throw new Exception(Constants.ForgotPasswordErrorMessage, ex); 
+            }            
         }
 
         public async Task<bool> ResetPassword(ResetPasswordRequestDTO resetPasswordRequest)
         {
-            try
-            {
+            var currentEATTime = DateTimeHelper.GetCurrentEATTime();
 
-                // Convert current time to EAT
-                var easternAfricaTimeZone = TimeZoneInfo.FindSystemTimeZoneById("E. Africa Standard Time");
-                var currentEATTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternAfricaTimeZone);
+            var passwordReset = await _context.PasswordResets
+            .Include(pr => pr.User)
+            .FirstOrDefaultAsync(pr => pr.ResetPasswordToken == resetPasswordRequest.Token && pr.ResetPasswordExpires > currentEATTime && !pr.Used);
 
-
-                var passwordReset = await _context.PasswordResets
-                .Include(pr => pr.User)
-                .FirstOrDefaultAsync(pr => pr.ResetPasswordToken == resetPasswordRequest.Token && pr.ResetPasswordExpires > currentEATTime && !pr.Used);
-
-                if (passwordReset == null) return false;
+            if (passwordReset == null) throw new Exception(Constants.InvalidUsernameOrPasswordMessage);
 
 
-                passwordReset.User.Password = BCrypt.Net.BCrypt.HashPassword(resetPasswordRequest.NewPassword);
-                passwordReset.Used = true;
+            passwordReset.User.Password = BCrypt.Net.BCrypt.HashPassword(resetPasswordRequest.NewPassword);
+            passwordReset.Used = true;
 
+            try 
+            {            
                 _context.Users.Update(passwordReset.User);
                 _context.PasswordResets.Update(passwordReset);
-
                 await _context.SaveChangesAsync();
-
                 return true;
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
-                throw new Exception("An error occurred while resetting the password", ex);
+                throw new Exception(Constants.ResetPasswordErrorMessage, ex);
             }
         }
 
