@@ -12,6 +12,8 @@ namespace tester.Data
         public DbSet<User> Users { get; set; }
         public DbSet<PasswordReset> PasswordResets { get; set; }
 
+        public DbSet<Product> Products { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<User>().HasIndex(u => u.Username).IsUnique();

@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using tester.DTOs;
+using tester.DTOs.Auth;
 using tester.Services.Interfaces;
 
 namespace tester.Controllers

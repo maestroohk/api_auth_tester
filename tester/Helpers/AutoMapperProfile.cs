@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
-using tester.DTOs;
+using tester.DTOs.Auth;
+using tester.DTOs.Products;
 using tester.Models;
 
 namespace tester.Helpers
@@ -11,6 +12,12 @@ namespace tester.Helpers
             CreateMap<User,UserRequestDTO>().ReverseMap();
 
             CreateMap<CreateUserRequestDTO,User>().ReverseMap();
+
+            CreateMap<CreateProductDTO, Product>().ReverseMap();
+
+            CreateMap<ProductDTO, Product>().ReverseMap();
+
+            CreateMap<UpdateProductDTO, Product>().ReverseMap();
         }
     }
 }

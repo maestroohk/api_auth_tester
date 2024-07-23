@@ -1,4 +1,4 @@
-﻿using tester.DTOs;
+﻿using tester.DTOs.Auth;
 using tester.Models;
 
 namespace tester.Services.Interfaces

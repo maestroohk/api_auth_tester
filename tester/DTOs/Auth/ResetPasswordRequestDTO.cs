@@ -1,4 +1,4 @@
-﻿namespace tester.DTOs
+﻿namespace tester.DTOs.Auth
 {
     public class ResetPasswordRequestDTO
     {
