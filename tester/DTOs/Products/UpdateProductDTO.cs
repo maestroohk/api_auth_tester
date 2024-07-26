@@ -19,14 +19,5 @@ namespace tester.DTOs.Products
         [Required]
         [MaxLength(255)]
         public required string ProductDescription { get; set; }
-
-        /*
-         * 
-         * [Required]
-        public int ProductQuantity { get; set; }
-
-        [Required]
-        public int ProductPr
-         * */
     }
 }
