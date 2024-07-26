@@ -18,6 +18,7 @@
         //Error Messages
         public const string UsernameAlreadyExistsMessage = "Username already exists";
         public const string AccountLockedMessage = "Account is locked. Please try again later";
+        public const string InvalidUsernameMessage = "Invalid username";
         public const string InvalidUsernameOrPasswordMessage = "Invalid username or password.";
         public const string RegistrationErrorMessage = "An error occurred while registering the user.";
         public const string LoginErrorMessage = "An error occurred while logging in.";

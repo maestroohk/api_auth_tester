@@ -6,7 +6,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using tester.Data;
-using tester.DTOs;
+using tester.DTOs.Auth;
 using tester.Helpers;
 using tester.Models;
 using tester.Services.Interfaces;
@@ -117,10 +117,13 @@ namespace tester.Services
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == forgotPasswordRequest.Email);
 
-            if (user == null) throw new Exception(Constants.InvalidUsernameOrPasswordMessage);
+            if (user == null) throw new Exception(Constants.InvalidUsernameMessage);
 
             var resetPasswordToken = Guid.NewGuid().ToString();
             var resetPasswordExpires = DateTimeHelper.GetCurrentEATTime().AddMinutes(Constants.PasswordResetTokenExpiryMinutes);
+
+                var resetPasswordToken = Guid.NewGuid().ToString();
+                var resetPasswordExpires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddMinutes(Constants.PasswordResetTokenExpiryMinutes), easternAfricaTimeZone);
 
             var passwordReset = new PasswordReset
             {
