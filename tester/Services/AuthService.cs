@@ -122,6 +122,9 @@ namespace tester.Services
             var resetPasswordToken = Guid.NewGuid().ToString();
             var resetPasswordExpires = DateTimeHelper.GetCurrentEATTime().AddMinutes(Constants.PasswordResetTokenExpiryMinutes);
 
+                var resetPasswordToken = Guid.NewGuid().ToString();
+                var resetPasswordExpires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddMinutes(Constants.PasswordResetTokenExpiryMinutes), easternAfricaTimeZone);
+
             var passwordReset = new PasswordReset
             {
                 UserId = user.UserId,
