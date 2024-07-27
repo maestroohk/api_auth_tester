@@ -55,8 +55,11 @@ namespace tester.Services
 
         public async Task<string> Login(LoginRequestDTO userForLogin)
         {
-            
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == userForLogin.Username);
+
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Username == userForLogin.Username);
 
             if (user == null || !user.Active) 
                 throw new Exception(Constants.InvalidUsernameOrPasswordMessage);
@@ -97,11 +100,21 @@ namespace tester.Services
                 Subject = new ClaimsIdentity(new[]
                 {
                 new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-                new Claim(ClaimTypes.Name, user.Username)
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(JwtRegisteredClaimNames.Aud, _configuration["Jwt:Audience"])
             }),
                 Expires = DateTime.UtcNow.AddDays(Convert.ToDouble(_configuration["Jwt:ExpireDays"])),
+                Issuer = _configuration["Jwt:Issuer"],
+                Audience = _configuration["Jwt:Audience"],
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
+
+            // Add roles to claims
+            var roles = user.UserRoles.Select(ur => ur.Role.RoleName);
+            foreach (var role in roles) 
+            {
+                tokenDescriptor.Subject.AddClaim(new Claim(ClaimTypes.Role, role));
+            }
 
             try
             {

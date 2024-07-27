@@ -10,5 +10,8 @@ namespace tester.Services.Interfaces
         Task<IEnumerable<ProductDTO>> GetAllProducts();
         Task<bool> DeleteProduct(int id);
         Task<bool> UpdateProduct(int id, UpdateProductDTO productDTO);
+
+        Task<Product> UpdateProductQuantity(int productId, UpdateProductQuantityDTO updateProductQuantityDTO);
+        Task<Product> UpdateProductPrice(int productId, UpdateProductPriceDTO updateProductPriceDTO);
     }
 }

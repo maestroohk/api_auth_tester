@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using tester.Data;
 using tester.DTOs.Products;
@@ -55,6 +56,24 @@ namespace tester.Services
             _mapper.Map(productDTO, product);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<Product> UpdateProductQuantity(int productId, UpdateProductQuantityDTO updateProductQuantityDTO)
+        {
+            var product = await _context.Products.FindAsync(productId);
+            if (product == null) return null;
+            product.ProductQuantity = updateProductQuantityDTO.ProductQuantity;
+            await _context.SaveChangesAsync();
+            return product;
+        }
+
+        public async Task<Product> UpdateProductPrice(int productId, UpdateProductPriceDTO updateProductPriceDTO)
+        {
+            var product = await _context.Products.FindAsync(productId);
+            if (product == null) return null;
+            product.ProductPrice = updateProductPriceDTO.ProductPrice;
+            await _context.SaveChangesAsync();
+            return product;
         }
     }
 }
