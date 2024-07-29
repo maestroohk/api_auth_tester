@@ -6,24 +6,20 @@ namespace tester.Models
     public class User
     {
         [Key]
-        [Column("user_id")]
         public int UserId { get; set; }
 
         [Required]
-        [Column("first_name")]
-        public string FirstName { get; set; }
+        public required string FirstName { get; set; }
 
         [Required]
-        [Column("last_name")]
-        public string LastName { get; set; }
+        public required string LastName { get; set; }
         
         [Required]
-        [Column("username")]
-        public string Username { get; set; }
+        [EmailAddress]
+        public required string Username { get; set; }
         
         [Required]
-        [Column("password")]
-        public string Password { get; set; }
+        public required string Password { get; set; }
 
         [Required]
         public bool Active{ get; set; }
@@ -31,6 +27,8 @@ namespace tester.Models
         public int FailedLoginAttempts { get; set; }
 
         public DateTime? LockoutEnd { get; set; }
+
+        public ICollection<UserRole> UserRoles { get; set; }
 
     }
 }
